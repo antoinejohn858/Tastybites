@@ -1,0 +1,12 @@
+TASTY BITES — application de caisse simple
+Fichiers : index.html
+
+Utilisation de test :
+1. Transférez index.html sur le Sunmi V2 Pro (USB, téléchargement ou partage de fichier).
+2. Ouvrez le fichier avec le navigateur Android/Chrome.
+3. Ajoutez Burger Ti Malice et/ou Frites, choisissez le paiement, puis Imprimer le reçu.
+4. « Enregistrer la vente » conserve l'historique dans le navigateur de cet appareil.
+
+Important :
+Cette version est un prototype web. Le bouton Imprimer ouvre la boîte d'impression du navigateur; il ne garantit pas l'impression directe sur l'imprimante thermique intégrée Sunmi. Pour une impression native directe, il faut empaqueter l'application Android et intégrer le SDK Sunmi adapté au modèle/firmware. Testez d'abord sur le terminal.
+Les données d'historique sont locales au navigateur et peuvent être perdues si les données du navigateur sont effacées.
