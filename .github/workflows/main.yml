@@ -1,6 +1,4 @@
 name: Build Tasty Bites APK
-_name:Copy update web assets
-run:npx cap copy android
 on:
   workflow_dispatch:
 
