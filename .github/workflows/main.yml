@@ -11,35 +11,122 @@ jobs:
       - name: Get project files
         uses: actions/checkout@v4
 
-      - name: Prepare Android project
-        run: |
-          mkdir -p www
-          cp Index.html www/index.html
-          cat > package.json <<'EOF'
-          {
-            "name": "tasty-bites",
-            "version": "1.0.0",
-            "description": "Tasty Bites restaurant cashier",
-            "scripts": {
-              "build": "echo Build Tasty Bites"
-            },
-            "dependencies": {
-              "@capacitor/core": "6.2.1",
-              "@capacitor/android": "6.2.1",
-              "@capacitor/cli": "6.2.1"
-            }
-          }
-          EOF
-          npm install
-          npx cap init "Tasty Bites" "com.tastybites.caisse" --web-dir www
-          npx cap add android
-          npx cap sync android
-
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: Prepare Android project
+        run: |
+          mkdir -p www
+          cp Index.html www/index.html
+
+          cat > package.json <<'EOF'
+          {
+            "name": "tasty-bites",
+            "version": "1.0.0",
+            "description": "Tasty Bites restaurant cashier",
+            "dependencies": {
+              "@capacitor/core": "6.2.1",
+              "@capacitor/android": "6.2.1",
+              "@capacitor/cli": "6.2.1",
+              "@kduma-autoid/capacitor-sunmi-printer": "0.5.6",
+              "esbuild": "0.24.2"
+            }
+          }
+          EOF
+
+          npm install
+
+          cat > printer-entry.js <<'EOF'
+          import { SunmiPrinter } from '@kduma-autoid/capacitor-sunmi-printer';
+          window.SunmiPrinter = SunmiPrinter;
+          EOF
+
+          npx cap init "Tasty Bites" "com.tastybites.caisse" --web-dir www
+
+          npx cap add android
+
+          npx cap sync android
+
+          npx esbuild printer-entry.js --bundle --platform=browser --format=iife --outfile=www/sunmi-printer.js
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("www/index.html")
+          s = p.read_text(encoding="utf-8")
+
+          if "window.print();" not in s:
+              raise SystemExit("Impossible de trouver le bouton d'impression existant.")
+
+          s = s.replace("window.print();", "printOnSunmi(sale);")
+
+          printer_function = r'''
+          async function printOnSunmi(s) {
+            const p = window.SunmiPrinter;
+
+            if (!p) {
+              alert("Le service d'impression SUNMI n'est pas chargé.");
+              return;
+            }
+
+            try {
+              await p.bindService();
+              await p.printerInit();
+              await p.setAlignment({alignment: "center"});
+              await p.setBold({enable: true});
+              await p.printText({text: "*** TASTY BITES ***\n"});
+              await p.setBold({enable: false});
+              await p.setAlignment({alignment: "left"});
+
+              await p.printText({
+                text: "Catalpa #6\nGourdes haïtiennes\n"
+                    + "------------------------------\n"
+                    + "Reçu N° " + String(s.no).padStart(5, "0") + "\n"
+                    + s.date + "\n"
+                    + "------------------------------\n"
+              });
+
+              for (const item of s.items) {
+                await p.printText({
+                  text: item.qty + " x " + item.name + "\n"
+                      + money(item.qty * item.price) + "\n"
+                });
+              }
+
+              await p.printText({
+                text: "------------------------------\n"
+                    + "TOTAL : " + money(s.total) + "\n"
+                    + "PAIEMENT : " + s.payment + "\n"
+                    + "STATUT : PAYÉ\n\n"
+                    + "Merci et à bientôt !\n\n\n"
+              });
+
+              alert("Commande envoyée à l'imprimante SUNMI.");
+            } catch (e) {
+              alert("Erreur d'impression : " + (e.message || e));
+            }
+          }
+          '''
+
+          if "</script>" not in s:
+              raise SystemExit("Balise script introuvable.")
+
+          s = s.replace("</script>", printer_function + "\n</script>", 1)
+
+          if "</body>" not in s:
+              raise SystemExit("Balise body introuvable.")
+
+          s = s.replace(
+              "</body>",
+              '<script src="sunmi-printer.js"></script>\n</body>',
+              1
+          )
+
+          p.write_text(s, encoding="utf-8")
+          PY
 
       - name: Build APK
         run: |
